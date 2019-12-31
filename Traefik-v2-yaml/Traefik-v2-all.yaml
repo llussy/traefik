@@ -1,0 +1,259 @@
+---
+# traefik-ingress-dashboard
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: traefik-ingress-dashboard
+  annotations:
+    helm.sh/hook: "post-install"
+  labels:
+    app: traefik
+    chart: "traefik-2.2.2"
+    release: "traefik-ingress"
+    heritage: "Tiller"
+spec:
+  entryPoints:
+    - web
+  routes:
+  # - match: PathPrefix(`/dashboard`) || PathPrefix(`/api`)
+  - match: Host('traefik.llussy.com')
+    kind: Rule
+    services:
+    - name: api@internal
+      kind: TraefikService
+MANIFEST:
+
+---
+# Source: traefik/templates/rbac/serviceaccount.yaml
+kind: ServiceAccount
+apiVersion: v1
+metadata:
+  name: traefik-ingress
+---
+# Source: traefik/templates/crd/ingressroute.yaml
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  name: ingressroutes.traefik.containo.us
+spec:
+  group: traefik.containo.us
+  version: v1alpha1
+  names:
+    kind: IngressRoute
+    plural: ingressroutes
+    singular: ingressroute
+  scope: Namespaced
+---
+# Source: traefik/templates/crd/ingressroutetcp.yaml
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  name: ingressroutetcps.traefik.containo.us
+spec:
+  group: traefik.containo.us
+  version: v1alpha1
+  names:
+    kind: IngressRouteTCP
+    plural: ingressroutetcps
+    singular: ingressroutetcp
+  scope: Namespaced
+---
+# Source: traefik/templates/crd/middlewares.yaml
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  name: middlewares.traefik.containo.us
+spec:
+  group: traefik.containo.us
+  version: v1alpha1
+  names:
+    kind: Middleware
+    plural: middlewares
+    singular: middleware
+  scope: Namespaced
+---
+# Source: traefik/templates/crd/tlsoptions.yaml
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  name: tlsoptions.traefik.containo.us
+spec:
+  group: traefik.containo.us
+  version: v1alpha1
+  names:
+    kind: TLSOption
+    plural: tlsoptions
+    singular: tlsoption
+  scope: Namespaced
+---
+# Source: traefik/templates/crd/traefikservice.yaml
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  name: traefikservices.traefik.containo.us
+spec:
+  group: traefik.containo.us
+  version: v1alpha1
+  names:
+    kind: TraefikService
+    plural: traefikservices
+    singular: traefikservice
+  scope: Namespaced
+---
+# Source: traefik/templates/rbac/clusterrole.yaml
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: traefik-ingress
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - pods
+      - services
+      - endpoints
+      - secrets
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - extensions
+    resources:
+      - ingresses
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - extensions
+    resources:
+      - ingresses/status
+    verbs:
+      - update
+  - apiGroups:
+      - traefik.containo.us
+    resources:
+      - ingressroutes
+      - ingressroutetcps
+      - middlewares
+      - tlsoptions
+      - traefikservices
+    verbs:
+      - get
+      - list
+      - watch
+---
+# Source: traefik/templates/rbac/clusterrolebinding.yaml
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: traefik-ingress
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: traefik-ingress
+subjects:
+- kind: ServiceAccount
+  name: traefik-ingress
+  namespace: kube-system
+---
+# Source: traefik/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: traefik-ingress
+  labels:
+    app: traefik
+    chart: "traefik-2.2.2"
+    release: "traefik-ingress"
+    heritage: "Tiller"
+spec:
+  type: LoadBalancer
+  selector:
+    app: traefik
+    release: traefik-ingress
+  ports:
+  - port: 80
+    name: web
+    targetPort: "web"
+  - port: 443
+    name: websecure
+    targetPort: "websecure"
+---
+# Source: traefik/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: traefik-ingress
+  labels:
+    app: traefik
+    chart: traefik-2.2.2
+    release: "traefik-ingress"
+    heritage: "Tiller"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: traefik
+      release: traefik-ingress
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+
+  template:
+    metadata:
+      labels:
+        app: traefik
+        chart: traefik-2.2.2
+        release: "traefik-ingress"
+        heritage: "Tiller"
+    spec:
+      serviceAccountName: traefik-ingress
+      terminationGracePeriodSeconds: 60
+      containers:
+      - image: traefik:2.1.1
+        name: traefik-ingress
+        resources:
+        readinessProbe:
+          httpGet:
+            path: /ping
+            port: 9000
+          failureThreshold: 1
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 2
+        livenessProbe:
+          httpGet:
+            path: /ping
+            port: 9000
+          failureThreshold: 3
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 2
+        ports:
+        - name: "traefik"
+          containerPort: 9000
+          protocol: TCP
+        - name: "web"
+          containerPort: 8000
+          protocol: TCP
+        - name: "websecure"
+          containerPort: 8443
+          protocol: TCP
+        args:
+          - "--global.checknewversion=true"
+          - "--global.sendanonymoususage=true"
+          - "--entryPoints.traefik.address=:9000"
+          - "--entryPoints.web.address=:8000"
+          - "--entryPoints.websecure.address=:8443"
+          - "--api.dashboard=true"
+          - "--ping=true"
+          - "--providers.kubernetescrd"
+          - "--log.level=WARN"
+      nodeSelector:
+        lb: traefik
