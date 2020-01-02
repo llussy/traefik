@@ -8,3 +8,10 @@ traefik-ingress       	1       	Tue Dec 31 17:18:02 2019	DEPLOYED	traefik-2.2.2 
 
 helm get traefik-ingress > Traefik-v2-all.yaml
 ```
+
+### Traefik-v2-yaml
+```bash
+Traefik-v2-all.yaml 包含所有资源,比较多，不建议使用。
+建议分开使用，deployment.yaml 和daemonset.yaml 任选其一。
+
+```
