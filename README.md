@@ -21,3 +21,12 @@ kubectl apply -f deployment.yaml  或 kubectl apply -f  daemonset.yam
 kubectl apply -f dashboard.yaml
 
 ```
+
+
+### traefik-migration-tool
+
+```bash
+# 迁移工具 https://github.com/containous/traefik-migration-tool
+# 使用 kubectl  get ingress --all-namespaces  导出yaml文件,放到input文件夹里
+./traefik-migration-tool ingress -i ./input/ -o output/
+```
