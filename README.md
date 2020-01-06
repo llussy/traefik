@@ -30,3 +30,21 @@ kubectl apply -f dashboard.yaml
 # 使用 kubectl  get ingress --all-namespaces  导出yaml文件,放到input文件夹里
 ./traefik-migration-tool ingress -i ./input/ -o output/
 ```
+
+### IngressRouteTCP
+[Traefik 2.0 暴露 Redis(TCP) 服务](https://www.qikqiak.com/post/expose-redis-by-traefik2/)
+```bash
+# traefik 配置中需要加上 - "--entryPoints.redis.address=:6379"
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRouteTCP
+metadata:
+  name: redis
+spec:
+  entryPoints:
+    - redis
+  routes:
+  - match: HostSNI(`redis.test.com`)
+    services:
+    - name: redis
+      port: 6379
+```
